@@ -7,7 +7,7 @@ name: gluetun-webui
 
 services:
   gluetun-webui:
-    image: scuzza/gluetun-webui:latest
+    image: gluetun-webui:latest
     container_name: gluetun-webui
     ports:
       - "127.0.0.1:3000:3000"
@@ -30,6 +30,8 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    volumes: 
+      - <PATH-TO-GLUETUN-SERVER-JSON-FILES>/gluetun/servers:/app/json/:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
       interval: 30s
