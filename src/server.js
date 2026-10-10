@@ -8,6 +8,131 @@ app.set('trust proxy', process.env.TRUST_PROXY === 'true');
 app.disable('x-powered-by');
 const PORT = process.env.PORT || 3000;
 
+// Directory to list providers files (change as needed)
+const BASE_DIR = path.join( __dirname, "../../");
+let allowedFiles = {};
+
+
+// Serve static files (HTML, CSS, JS)
+app.use(express.static(__dirname));
+
+
+
+/// Filelist for Selecting VPN Provider ////
+app.get ('/api/files', (req, res) => { 
+  try {
+    // Sanitize and resolve directory path
+    const requestedDir = req.query.dir ? req.query.dir.trim() : "";
+    const targetDir = path.join(BASE_DIR, 'app/json', requestedDir);
+
+    // Prevent directory traversal attacks
+    if (!targetDir.startsWith(BASE_DIR)) {
+      return res.status(400).json({ error: "Invalid directory path." });
+    }
+    // Check if directory exists
+    if (!fs.existsSync(targetDir) || !fs.lstatSync(targetDir).isDirectory()) {
+      return res.status(404).json({ error: "Directory not found." });
+    }
+
+    // Read directory contents
+    const files = fs.readdirSync(targetDir)
+    .filter(file => {
+        // Ensure it's a file and has the desired extension
+        return path.extname(file).toLowerCase() === '.json'; 
+      })
+    .filter(file => file !== "manifest.json")
+    .map(file => ({
+      name: file.split(".")[0]
+    }));
+
+
+files.forEach(file => {
+  const key = file.name;
+  const value = file.name + ".json";
+  allowedFiles[key] = value;
+});
+
+    res.json({ files });
+    
+  } catch (err) {
+    console.error("Error reading directory:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+
+
+// Utility function to safely read and parse JSON
+function readJSONFile(filePath) {
+    try {
+        const data = fs.readFileSync(filePath, "utf8");
+        return JSON.parse(data);
+    } catch (err) {
+        throw new Error(`Error reading or parsing file: ${err.message}`);
+    }
+}
+
+
+// Route: Select JSON file based on request
+
+// API endpoint to get JSON data
+/*
+app.get('/api/data', (req, res) => {
+  const filePath = 'nordvpn.json';
+
+
+  fs.readFile(filePath, 'utf8', (err, jsonData) => {
+    if (err) {
+      console.error('Error reading JSON file:', err);
+      return res.status(500).json({ error: 'Failed to read data' });
+    }
+
+        try {
+            const data = JSON.parse(jsonData);
+            if (!Array.isArray(data.servers)) {
+                return res.status(400).json({ error: 'JSON is not an array' });
+            }
+
+            var _ = require('underscore');
+            var vpntype = 'vpn'; // ensures all arrays has a name vpn
+            var filtered = _.filter(data.servers, function(element){
+                return _.has(element, vpntype); 
+            });
+
+            res.json(filtered);  // returns wireguard arrays
+        } catch (parseErr) {
+            console.error('Invalid JSON format:', parseErr);
+            res.status(500).json({ error: 'Invalid JSON format' });
+        }
+
+    });
+});
+*/
+app.get('/api/data/:fileName', (req, res) => {
+    const { fileName } = req.params;
+// console.log('AF:',allowedFiles);
+    if (!allowedFiles[fileName]) {
+        return res.status(400).json({ error: "Invalid file requested" });
+    }
+    const filePath = path.join(BASE_DIR, "app/json", allowedFiles[fileName]);
+
+    try {
+        const data = readJSONFile(filePath);
+            var _ = require('underscore');
+            var vpntype = 'vpn'; // ensures all arrays has a name vpn
+            var filtered = _.filter(data.servers, function(element){
+                return _.has(element, vpntype); 
+            });
+
+        res.json(filtered);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
+
+
 // --- Docker Secrets Support ---
 // Try to read from /run/secrets/ (Docker Swarm/Compose secrets), fall back to env vars
 function getConfigValue(envVar, secretName = null) {
@@ -96,7 +221,7 @@ const readLimiter = rateLimit({
   message: { ok: false, error: 'Too many requests, please try again later.' },
 });
 
-// UI/static route rate limiter – protects filesystem access for SPA index.html
+// UI/static route rate limiter - protects filesystem access for SPA index.html
 const uiLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 1000, // limit each IP to 1000 requests per windowMs
@@ -118,13 +243,14 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '2kb' }));
+app.use(express.json({ limit: '2mb' }));
 app.use(uiLimiter, express.static(path.join(__dirname, 'public')));
 
 async function gluetunFetch(instance, endpoint, method = 'GET', body = null) {
   const url = `${instance.url}${endpoint}`;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  const ms = method === 'PUT' ? 60000 : 5000;
+  const timeoutId = setTimeout(() => controller.abort(), ms);
   const opts = {
     method,
     signal: controller.signal,
@@ -141,7 +267,8 @@ async function gluetunFetch(instance, endpoint, method = 'GET', body = null) {
       const text = await res.text().catch(() => '');
       throw new Error(`Gluetun returned ${res.status}${text ? ': ' + text.slice(0, 200).trim() : ''}`);
     }
-    return res.json();
+    const text = await res.text();
+    try { return JSON.parse(text); } catch { return text; }
   } finally {
     clearTimeout(timeoutId);
   }
@@ -234,6 +361,44 @@ app.get('/api/settings', async (req, res) => {
   }
 });
 
+///////////////////////////////////////////////////////////////
+
+
+
+
+
+
+app.get('/api/:instanceId/settings', async (req, res) => {
+  const instance = resolveInstance(req.params.instanceId);
+  if (!instance) return res.status(400).json({ ok: false, error: 'Unknown instance ID' });
+  try {
+    const data = await gluetunFetch(instance, '/v1/vpn/settings');
+    res.json({ ok: true, data });
+  } catch (err) {
+    console.error('[upstream]', err.message);
+    res.status(502).json({ ok: false, error: 'Upstream error' });
+  }
+});
+
+app.put('/api/:instanceId/settings', async (req, res) => {
+  const instance = resolveInstance(req.params.instanceId);
+  if (!instance) return res.status(400).json({ ok: false, error: 'Unknown instance ID' });
+  try {
+    const data = await gluetunFetch(
+      instance,
+      '/v1/vpn/settings',
+      'PUT',
+      req.body
+    );
+    res.json({ ok: true, data });
+  } catch (err) {
+    console.error('[upstream]', err.message);
+    res.status(502).json({ ok: false, error: 'Upstream error' });
+  }
+});
+
+
+
 app.get('/api/dns', async (req, res) => {
   try {
     const data = await gluetunFetch(instances[0], '/v1/dns/status');
@@ -306,14 +471,14 @@ app.put('/api/vpn/:action', vpnActionLimiter, async (req, res) => {
   }
 });
 
-// 404 for undefined /api/* routes – must come before SPA catch-all
+// 404 for undefined /api/* routes - must come before SPA catch-all
 app.use('/api/', (req, res) => res.status(404).json({ ok: false, error: 'Not found' }));
 
 app.get('*', staticLimiter, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Global error handler – catches synchronous throws and next(err) calls
+// Global error handler - catches synchronous throws and next(err) calls
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error('[error]', err.message);
@@ -322,5 +487,5 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`Gluetun Web UI running on port ${PORT}`);
-  instances.forEach(inst => console.log(`  [${inst.id}] ${inst.name} → ${inst.url}`));
+  instances.forEach(inst => console.log(`  [${inst.id}] ${inst.name} ? ${inst.url}`));
 });
