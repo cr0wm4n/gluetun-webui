@@ -56,6 +56,8 @@ A lightweight web UI for monitoring and controlling [Gluetun](https://github.com
 
 ## Screenshots
 ![alt text](image-1.png)
+![alt text](image2.png)
+![alt text](imageall.png)
 
 ---
 
