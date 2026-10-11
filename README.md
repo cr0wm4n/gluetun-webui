@@ -36,10 +36,12 @@ This is a Modified version of Sir-Scuzza's web UI, the VPN connection panel, has
 Only tested with NordVPN but should work with any of Gluetun's Providers, In Single Instance Mode.
 
 In your compose.yaml add a volume that maps the Gluetun servers/*.json folder to /app/json
-eg : 
-volumes:
-  - [PATH TO GLUETUN]/servers:/app/json/:ro
 
+example..
+```yaml
+ volumes:
+  - [PATH TO GLUETUN]/servers:/app/json/:ro
+```
 The VPN Connection  will initially start with a single provider dropdown.
 Select your VPN provider
 Then more dropdowns will appear for the different available filter options like Protocol, Categories, Regions, Countries Cities, Hostnames. 
