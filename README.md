@@ -32,6 +32,30 @@
 
 # Gluetun WebUI
 
+This is a Modified version of Sir-Scuzza's web UI, the VPN connection panel, has dropdown filter lists.
+Only tested with NordVPN but should work with any of Gluetun's Providers, In Single Instance Mode.
+
+In your compose.yaml add a volume that maps the Gluetun servers/*.json folder to /app/json
+eg : 
+volumes:
+  - [PATH TO GLUETUN]/servers:/app/json/:ro
+
+The VPN Connection  will initially start with a single provider dropdown.
+Select your VPN provider
+Then more dropdowns will appear for the different available filter options like Protocol, Categories, Regions, Countries Cities, Hostnames. 
+Filtering is top down order, so for example if Country is set to Spain, you will only see Cities and Hostnames in Spain.
+filter However you want by setting all of the dropdowns or just the levels you want to set at.
+Added a couple of screenshots below of the VPN Connection panel.
+Hit the Switch VPN button to commit the change to Gluetun, The VPN will restart with the selected options.
+
+## VPN Screenshots
+
+| Filter on Any           | Or on all                 |
+| ----------------------- | ------------------------- |
+| ![alt text](image2.png) | ![alt text](imageall.png) |
+
+# Original README ----- 
+
 A lightweight web UI for monitoring and controlling [Gluetun](https://github.com/qdm12/gluetun) — the VPN client container for Docker.
 
 ![Status: Connected](https://img.shields.io/badge/status-connected-brightgreen)
@@ -56,8 +80,6 @@ A lightweight web UI for monitoring and controlling [Gluetun](https://github.com
 
 ## Screenshots
 ![alt text](image-1.png)
-![alt text](image2.png)
-![alt text](imageall.png)
 
 ---
 
