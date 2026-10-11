@@ -46,7 +46,9 @@ The VPN Connection  will initially start with a single provider dropdown.
 Select your VPN provider
 Then more dropdowns will appear for the different available filter options like Protocol, Categories, Regions, Countries Cities, Hostnames. 
 Filtering is top down order, so for example if Country is set to Spain, you will only see Cities and Hostnames in Spain.
+Any dropdowns not set will use defaults, so for example you set only a Country, it will use the best available City/Server within the selected Country.
 filter However you want by setting all of the dropdowns or just the levels you want to set at.
+
 Added a couple of screenshots below of the VPN Connection panel.
 Hit the Switch VPN button to commit the change to Gluetun, The VPN will restart with the selected options.
 
